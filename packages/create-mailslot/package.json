@@ -1,7 +1,7 @@
 {
   "name": "create-mailslot",
-  "version": "0.0.1",
-  "description": "Deploy Mailslot — a self-hosted email inbox for AI agents — to your own Cloudflare account. Wizard coming soon.",
+  "version": "0.1.0",
+  "description": "Deploy Mailslot \u2014 a self-hosted email inbox for AI agents \u2014 to your own Cloudflare account.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -9,8 +9,15 @@
   },
   "files": [
     "index.js",
+    "lib",
     "README.md"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mailslot/mailslot.git"
@@ -26,6 +33,6 @@
   ],
   "scripts": {
     "typecheck": "true",
-    "test": "true"
+    "test": "node --test"
   }
 }
