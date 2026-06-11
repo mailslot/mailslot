@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local development (never commit .dev.vars)
+# Generate a token: openssl rand -base64 32
+MAILSLOT_TOKEN=replace-me
+
+# Optional — HMAC-sign webhook payloads
+# WEBHOOK_SECRET=replace-me

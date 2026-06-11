@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mailslot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "Inbox", "class_name": "Inbox" },
+      { "name": "MailslotMcp", "class_name": "MailslotMcp" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Inbox", "MailslotMcp"] }
+  ],
+  "r2_buckets": [
+    { "binding": "RAW", "bucket_name": "mailslot-raw" }
+  ],
+  "vars": {
+    // "all" forwards every inbound message to FORWARD_TO (a verified destination); "none" disables
+    "FORWARD_MODE": "none"
+  },
+  // Instance-specific values are NOT in this file (it ships generic in the repo).
+  // Set once per instance; keep_vars makes them survive every deploy:
+  //   EMAIL_DOMAIN   — var, set in dashboard (Workers → mailslot → Settings → Variables)
+  //                    or first deploy: wrangler deploy --var EMAIL_DOMAIN:mail.example.com
+  //   MAILSLOT_TOKEN — secret: openssl rand -hex 24 | wrangler secret put MAILSLOT_TOKEN
+  // Optional dashboard vars: FORWARD_TO, WEBHOOK_URL; optional secret: WEBHOOK_SECRET
+  "keep_vars": true,
+  "alias": {
+    // Optional dep of the agents SDK, dynamically imported in paths we don't use
+    "ai": "./src/shims/ai.ts"
+  },
+  "observability": { "enabled": true }
+  // Secrets (set via `wrangler secret put`):
+  //   MAILSLOT_TOKEN  — bearer token for HTTP API + MCP
+  //   WEBHOOK_SECRET  — optional, HMAC-signs webhook payloads
+  // Optional vars: FORWARD_TO, WEBHOOK_URL
+}

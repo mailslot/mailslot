@@ -1,0 +1,31 @@
+{
+  "name": "create-mailslot",
+  "version": "0.0.1",
+  "description": "Deploy Mailslot — a self-hosted email inbox for AI agents — to your own Cloudflare account. Wizard coming soon.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-mailslot": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mailslot/mailslot"
+  },
+  "homepage": "https://mailslot.dev",
+  "keywords": [
+    "ai-agents",
+    "email",
+    "mcp",
+    "cloudflare-workers",
+    "self-hosted",
+    "agentmail-alternative"
+  ],
+  "scripts": {
+    "typecheck": "true",
+    "test": "true"
+  }
+}
