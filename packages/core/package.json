@@ -23,7 +23,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/mailslot/mailslot"
+    "url": "git+https://github.com/mailslot/mailslot.git"
   },
   "scripts": {
     "dev": "wrangler dev",
