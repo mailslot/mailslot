@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import * as p from "@clack/prompts";
 import { sh, shInteractive, sleep } from "./sh.js";
-import { mxRecords, isCloudflareMx, isCloudflareNs, findZone, waitForCloudflareMx } from "./dns.js";
+import { mxRecords, isCloudflareMx, isCloudflareNs, findZone, waitForCloudflareMx, zoneRoutingState } from "./dns.js";
 import { templates, writeScaffold } from "./scaffold.js";
 import { zoneId, routingStatus, enableRouting, setCatchAllToWorker } from "./cf-api.js";
 
@@ -61,43 +61,72 @@ export async function run(argv) {
       bail(await p.text({ message: "Worker name", initialValue: "mailslot", validate: (v) => (/^[a-z0-9-]+$/.test(v) ? undefined : "lowercase letters, digits, dashes") }))
   );
 
-  // ---- DNS analysis & the apex-MX guard ----
+  // ---- DNS analysis & the zone-routing reality check ----
+  // Email Routing is zone-level: a subdomain only works once the ZONE has
+  // Email Routing enabled, and enabling it requires Cloudflare to own the
+  // apex MX. A zone whose apex mail lives elsewhere cannot host Mailslot
+  // at all (not even via a subdomain) without breaking that mail.
   const s = p.spinner();
-  s.start("Checking DNS");
-  const zone = await findZone(domain).catch(() => null);
-  if (!zone) {
-    s.stop("DNS check failed");
-    throw new Error(`could not find a DNS zone for ${domain} — is the domain registered and on Cloudflare?`);
-  }
-  const apex = zone.zone;
-  if (!isCloudflareNs(zone.ns)) {
-    s.stop("DNS check done");
-    p.log.warn(`${apex} does not appear to use Cloudflare nameservers.\nMailslot requires the zone to be on Cloudflare (free plan is fine).`);
-    const cont = bail(await p.confirm({ message: "Continue anyway?", initialValue: false }));
-    if (!cont) return p.outro("Add the domain to Cloudflare first, then re-run.");
-  } else {
-    s.stop(`Zone: ${apex} (Cloudflare ✓)`);
-  }
-
-  if (domain === apex) {
-    const apexMx = await mxRecords(apex).catch(() => []);
-    if (apexMx.length > 0 && !isCloudflareMx(apexMx)) {
-      p.log.warn(
-        `${apex} already receives mail (MX: ${apexMx[0]} …).\n` +
-          `Enabling Email Routing on the apex would require DELETING those records\n` +
-          `and would BREAK your existing email. Use a subdomain instead.`
-      );
-      const choice = bail(
-        await p.select({
-          message: "How should mail reach Mailslot?",
-          options: [
-            { value: `mail.${apex}`, label: `Use mail.${apex} (recommended — apex mail untouched)` },
-            { value: apex, label: `Use ${apex} anyway (DANGER: breaks existing mail)` }
-          ]
-        })
-      );
-      domain = choice;
+  let apex;
+  let zoneState; // "cloudflare" | "none" | "foreign" (foreign only if user forces)
+  for (;;) {
+    s.start("Checking DNS");
+    const zone = await findZone(domain).catch(() => null);
+    if (!zone) {
+      s.stop("DNS check failed");
+      throw new Error(`could not find a DNS zone for ${domain} — is the domain registered and on Cloudflare?`);
     }
+    apex = zone.zone;
+    const onCloudflare = isCloudflareNs(zone.ns);
+    const apexMx = await mxRecords(apex).catch(() => []);
+    zoneState = zoneRoutingState(apexMx);
+    s.stop(`Zone: ${apex}${onCloudflare ? " (Cloudflare ✓)" : ""} — email routing: ${zoneState}`);
+
+    if (!onCloudflare) {
+      p.log.warn(`${apex} does not appear to use Cloudflare nameservers.\nMailslot requires the zone to be on Cloudflare (free plan is fine).`);
+      const cont = bail(await p.confirm({ message: "Continue anyway?", initialValue: false }));
+      if (!cont) return p.outro("Add the domain to Cloudflare first, then re-run.");
+    }
+
+    if (zoneState !== "foreign") break;
+
+    p.log.error(
+      `${apex} already receives mail elsewhere (MX: ${apexMx[0]} …).\n\n` +
+        `Cloudflare Email Routing is zone-level: enabling it requires replacing\n` +
+        `the apex MX records, and subdomains can only be added AFTER the zone\n` +
+        `has Email Routing enabled. This domain cannot host Mailslot — not even\n` +
+        `on a subdomain — without breaking its existing email.`
+    );
+    if (flags.domain) {
+      throw new Error(`${apex} has a third-party mail provider — use a different domain (zone) for Mailslot`);
+    }
+    const choice = bail(
+      await p.select({
+        message: "What now?",
+        options: [
+          { value: "different", label: "Use a different domain (recommended — a spare domain or a fresh one)" },
+          { value: "force", label: `Proceed with ${apex} anyway (I will delete my provider's MX — BREAKS existing mail)` },
+          { value: "abort", label: "Abort" }
+        ]
+      })
+    );
+    if (choice === "abort") return p.outro("No changes made. A dedicated domain for agent mail is cheap and clean.");
+    if (choice === "force") {
+      const sure = bail(await p.confirm({ message: `Really proceed? Mail to @${apex} will stop working until you reconfigure it.`, initialValue: false }));
+      if (sure) break;
+      continue;
+    }
+    domain = String(
+      bail(
+        await p.text({
+          message: "Email domain for agent addresses (on Cloudflare)",
+          placeholder: "agentmail-domain.com",
+          validate: (v) => (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(v.trim()) ? undefined : "enter a valid domain")
+        })
+      )
+    )
+      .trim()
+      .toLowerCase();
   }
 
   const domainMx = await mxRecords(domain).catch(() => []);
@@ -161,7 +190,7 @@ export async function run(argv) {
 
   // ---- email routing ----
   if (!flags["skip-routing"]) {
-    await setupRouting({ apex, domain, workerName, routingReady, flags });
+    await setupRouting({ apex, domain, workerName, routingReady, zoneState, flags });
   }
 
   // ---- round-trip finale ----
@@ -188,7 +217,7 @@ export async function run(argv) {
   p.outro("Docs & issues: https://github.com/mailslot/mailslot");
 }
 
-async function setupRouting({ apex, domain, workerName, routingReady, flags }) {
+async function setupRouting({ apex, domain, workerName, routingReady, zoneState, flags }) {
   const isSubdomain = domain !== apex;
   let token = flags["cf-token"] ?? process.env.CLOUDFLARE_API_TOKEN ?? null;
   if (!token) {
@@ -209,11 +238,13 @@ async function setupRouting({ apex, domain, workerName, routingReady, flags }) {
       const zid = await zoneId(token, apex);
       if (!zid) throw new Error(`zone ${apex} not visible to this token`);
 
-      if (!routingReady && !isSubdomain) {
+      // Zone-level enable comes first — subdomains can only be enrolled
+      // once the zone has Email Routing.
+      if (zoneState !== "cloudflare") {
         const status = await routingStatus(token, zid).catch(() => null);
         if (status?.enabled !== true) await enableRouting(token, zid);
-        await waitForCloudflareMx(domain, { timeoutMs: 120_000 });
-        p.log.success("Email Routing enabled");
+        await waitForCloudflareMx(apex, { timeoutMs: 120_000 });
+        p.log.success(`Email Routing enabled on ${apex}`);
       }
 
       if (!routingReady && isSubdomain) {
@@ -231,17 +262,19 @@ async function setupRouting({ apex, domain, workerName, routingReady, flags }) {
 
   // Guided path
   if (!routingReady) {
-    if (isSubdomain) await guidedSubdomain(apex, domain);
-    else {
+    if (zoneState !== "cloudflare") {
       p.note(
         [
           `1. dash.cloudflare.com → ${apex} → Email Routing`,
-          `2. Enable Email Routing (accept the MX/SPF records)`
+          ...(zoneState === "foreign"
+            ? [`2. Delete the existing third-party MX records when prompted`, `   (this is the step that breaks your old mail — you chose this)`, `3. Enable Email Routing (accept the MX/SPF records)`]
+            : [`2. Enable Email Routing (accept the MX/SPF records)`])
         ].join("\n"),
-        "Enable Email Routing"
+        `Enable Email Routing on ${apex}`
       );
-      await waitForMxInteractive(domain);
+      await waitForMxInteractive(apex);
     }
+    if (isSubdomain) await guidedSubdomain(apex, domain);
   }
   p.note(
     [
@@ -259,9 +292,10 @@ async function guidedSubdomain(apex, domain) {
   const sub = domain.slice(0, -(apex.length + 1));
   p.note(
     [
+      `(requires Email Routing already enabled on ${apex})`,
       `1. dash.cloudflare.com → ${apex} → Email Routing → Settings`,
       `2. Subdomains → add "${sub}"`,
-      `3. Cloudflare writes MX/SPF on ${domain} only — apex mail is untouched`
+      `3. Cloudflare writes MX/SPF records on ${domain}`
     ].join("\n"),
     "Add the subdomain to Email Routing"
   );

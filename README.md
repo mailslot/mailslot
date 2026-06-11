@@ -73,10 +73,13 @@ npx wrangler deploy --var EMAIL_DOMAIN:mail.example.com
 ```
 
 3. **Enable Email Routing** on your domain in the Cloudflare dashboard
-   (zone → Email Routing). ⚠️ **If your apex domain already receives mail**
-   (Google Workspace, Lark, O365…), do **not** let the wizard touch apex MX
-   records — add a *subdomain* under Email Routing → Settings → Subdomains
-   instead, and use that as your `EMAIL_DOMAIN`.
+   (zone → Email Routing). ⚠️ **Email Routing is zone-level.** If the
+   domain's apex already receives mail elsewhere (Google Workspace, Lark,
+   O365…), enabling it requires deleting those MX records — and subdomains
+   can only be enrolled *after* the zone has Email Routing. In other words:
+   **a domain whose mail lives with another provider can't host Mailslot at
+   all, not even on a subdomain — use a separate domain.** (Subdomains work
+   fine on zones where Email Routing is already enabled.)
 
 4. **Point mail at the worker**: Email Routing → Routing rules →
    **Catch-all** → action *Send to a Worker* → `mailslot` → **Enabled**.

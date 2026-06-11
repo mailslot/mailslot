@@ -24,6 +24,23 @@ export function isCloudflareNs(records) {
 }
 
 /**
+ * Zone-level Email Routing state, inferred from the APEX MX records.
+ *
+ * Email Routing is a zone-level feature: subdomains can only be enrolled
+ * AFTER the zone has Email Routing enabled, and enabling it requires
+ * Cloudflare to own the apex MX. Consequences:
+ *   "cloudflare" — routing enabled; apex and subdomains both usable
+ *   "none"       — no mail yet; routing can be enabled cleanly
+ *   "foreign"    — apex mail lives elsewhere (Google/Lark/O365…); the zone
+ *                  CANNOT be used for Mailslot — not even via a subdomain —
+ *                  without deleting the provider's MX (breaking that mail)
+ */
+export function zoneRoutingState(apexMxRecords) {
+  if (apexMxRecords.length === 0) return "none";
+  return isCloudflareMx(apexMxRecords) ? "cloudflare" : "foreign";
+}
+
+/**
  * Walk labels upward until a zone apex (has NS records) is found.
  * mail.foo.example.com → example.com (where NS answers).
  */

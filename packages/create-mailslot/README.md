@@ -13,9 +13,11 @@ The wizard:
 
 1. **Scaffolds a project you own** — a thin worker depending on
    `@mailslot/core`, deployed from your machine with wrangler
-2. **Guards your existing mail** — if your apex domain already has MX records
-   (Google Workspace, Lark, O365…), it routes Mailslot through a subdomain
-   and never touches apex mail records
+2. **Guards your existing mail** — if the domain's apex already receives
+   mail elsewhere (Google Workspace, Lark, O365…), the wizard tells you the
+   truth: Email Routing is zone-level, so that domain can't host Mailslot —
+   not even on a subdomain — without breaking its mail. It steers you to a
+   different domain instead of letting you find out the hard way
 3. **Provisions everything** — R2 bucket, generated API token (secret),
    worker deploy with your domain baked in
 4. **Sets up Email Routing** — fully automatic with a Cloudflare API token

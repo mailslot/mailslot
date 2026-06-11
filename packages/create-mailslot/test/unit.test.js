@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseArgs } from "../lib/run.js";
 import { templates } from "../lib/scaffold.js";
-import { isCloudflareMx, isCloudflareNs, findZone } from "../lib/dns.js";
+import { isCloudflareMx, isCloudflareNs, findZone, zoneRoutingState } from "../lib/dns.js";
 
 test("parseArgs handles values and booleans", () => {
   const flags = parseArgs(["--dir", "out", "--skip-test", "--domain", "mail.x.com"]);
@@ -30,6 +30,16 @@ test("isCloudflareMx / isCloudflareNs detect Cloudflare records", () => {
   assert.equal(isCloudflareMx(["1 mx1.larksuite.com."]), false);
   assert.equal(isCloudflareNs(["dana.ns.cloudflare.com."]), true);
   assert.equal(isCloudflareNs(["ns1.google.com."]), false);
+});
+
+test("zoneRoutingState classifies apex MX correctly", () => {
+  // Routing enabled — apex and subdomains usable
+  assert.equal(zoneRoutingState(["34 route1.mx.cloudflare.net."]), "cloudflare");
+  // No mail yet — routing can be enabled cleanly
+  assert.equal(zoneRoutingState([]), "none");
+  // Third-party provider — zone unusable for Mailslot, even via subdomain
+  assert.equal(zoneRoutingState(["1 mx1.larksuite.com."]), "foreign");
+  assert.equal(zoneRoutingState(["1 aspmx.l.google.com."]), "foreign");
 });
 
 test("findZone walks labels until NS records answer", async () => {
