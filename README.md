@@ -159,7 +159,8 @@ Want an adapter we don't have? The contract is small — PRs welcome.
 - [ ] v1: receive → parse → store → MCP/HTTP tools → webhooks → forward
 - [ ] `create-mailslot` deploy wizard
 - [ ] n8n community node, OpenClaw skill
-- [ ] Reply support (`replyToEmail` — no ESP needed for replies)
+- [x] Return-receipt auto-reply (`replyToEmail` — no ESP needed; set
+      `RECEIPT_ADDRESSES` to enable per address, auto-mail loop guards built in)
 - [ ] Outbound via your own Resend/Postmark/SES keys (BYO, your deliverability)
 
 Deliberately **not** planned: hosted multi-tenant service, AI triage of your
