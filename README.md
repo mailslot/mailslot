@@ -55,10 +55,29 @@ Exposed three ways, same engine:
 
 ## Quick start
 
-> The `create-mailslot` wizard will automate all of this. Until it ships,
-> manual setup is ~10 minutes:
+```sh
+npx create-mailslot
+```
 
-Requirements: a Cloudflare account (free tier works) and a domain you control.
+Ten minutes, interactively: scaffolds a project **you own**, provisions
+storage and an API token, deploys the worker, walks Email Routing setup
+(Cloudflare API token or guided dashboard steps with live DNS verification),
+and finishes with a live round-trip — send an email from your phone, watch
+it arrive in your terminal. Flags for non-interactive use are in the
+[wizard's README](packages/create-mailslot/README.md).
+
+Requirements: Node 18+, a Cloudflare account (free tier works), and a domain
+on Cloudflare.
+
+> ⚠️ **Domain reality check (the wizard enforces this):** Email Routing is
+> zone-level. If a domain's apex already receives mail elsewhere (Google
+> Workspace, Lark, O365…), that domain can't host Mailslot at all — not
+> even on a subdomain — without breaking its existing mail. Use a separate
+> domain. (Subdomains work fine on zones where Email Routing is already
+> enabled.)
+
+<details>
+<summary><b>Manual setup</b> (what the wizard automates)</summary>
 
 ```sh
 git clone https://github.com/mailslot/mailslot && cd mailslot && npm install
@@ -73,13 +92,7 @@ npx wrangler deploy --var EMAIL_DOMAIN:mail.example.com
 ```
 
 3. **Enable Email Routing** on your domain in the Cloudflare dashboard
-   (zone → Email Routing). ⚠️ **Email Routing is zone-level.** If the
-   domain's apex already receives mail elsewhere (Google Workspace, Lark,
-   O365…), enabling it requires deleting those MX records — and subdomains
-   can only be enrolled *after* the zone has Email Routing. In other words:
-   **a domain whose mail lives with another provider can't host Mailslot at
-   all, not even on a subdomain — use a separate domain.** (Subdomains work
-   fine on zones where Email Routing is already enabled.)
+   (zone → Email Routing), respecting the domain reality check above.
 
 4. **Point mail at the worker**: Email Routing → Routing rules →
    **Catch-all** → action *Send to a Worker* → `mailslot` → **Enabled**.
@@ -94,6 +107,8 @@ WORKER=https://mailslot.<your-subdomain>.workers.dev
 curl -s "$WORKER/v1/inboxes/<address>/wait?timeout_s=90" \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+</details>
 
 Config lives in two instance-specific values that survive every deploy
 (`keep_vars`): `EMAIL_DOMAIN` (var — dashboard-editable) and `MAILSLOT_TOKEN`
@@ -159,11 +174,11 @@ Want an adapter we don't have? The contract is small — PRs welcome.
 
 ## Roadmap
 
-- [ ] v1: receive → parse → store → MCP/HTTP tools → webhooks → forward
-- [ ] `create-mailslot` deploy wizard
-- [ ] n8n community node, OpenClaw skill
+- [x] v1: receive → parse → store → MCP/HTTP tools → webhooks → forward
+- [x] `create-mailslot` deploy wizard
 - [x] Return-receipt auto-reply (`replyToEmail` — no ESP needed; set
       `RECEIPT_ADDRESSES` to enable per address, auto-mail loop guards built in)
+- [ ] n8n community node, OpenClaw skill
 - [ ] Outbound via your own Resend/Postmark/SES keys (BYO, your deliverability)
 
 Deliberately **not** planned: hosted multi-tenant service, AI triage of your
