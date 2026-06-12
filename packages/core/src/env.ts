@@ -18,6 +18,12 @@ declare global {
       WEBHOOK_URL?: string;
       /** If set, webhook payloads are HMAC-SHA256 signed (X-Mailslot-Signature). */
       WEBHOOK_SECRET?: string;
+      /**
+       * Comma-separated addresses that auto-reply with a "return receipt"
+       * showing what the worker parsed (proof-of-handling). Replies are
+       * suppressed for auto-generated, bulk, and bounce mail.
+       */
+      RECEIPT_ADDRESSES?: string;
     }
   }
 }

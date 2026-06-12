@@ -1,18 +1,7 @@
-import { Agent } from "agents";
+import { Agent, type AgentEmail } from "agents";
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
 import { extractLinks, extractOtp, htmlToText, makeSnippet } from "./extract";
-
-/** Shape of the AgentEmail proxy passed by routeAgentEmail (agents SDK). */
-type AgentEmail = {
-  from: string;
-  to: string;
-  headers: Headers;
-  rawSize: number;
-  getRaw: () => Promise<Uint8Array>;
-  setReject: (reason: string) => void;
-  forward: (rcptTo: string, headers?: Headers) => Promise<void>;
-};
 
 export type MessageSummary = {
   id: string;
@@ -87,6 +76,13 @@ export class Inbox extends Agent<Env> {
     return this.name;
   }
 
+  private isReceiptAddress(): boolean {
+    return (this.env.RECEIPT_ADDRESSES ?? "")
+      .split(",")
+      .map((a) => a.trim().toLowerCase())
+      .includes(this.address);
+  }
+
   async onEmail(email: AgentEmail) {
     const raw = await email.getRaw();
     const parsed = await PostalMime.parse(raw);
@@ -112,6 +108,19 @@ export class Inbox extends Agent<Env> {
         await email.forward(this.env.FORWARD_TO);
       } catch (e) {
         console.error(`forward to ${this.env.FORWARD_TO} failed:`, e);
+      }
+    }
+
+    // Return receipt: visible proof the worker handled the mail.
+    // Reply goes back through Email Routing (no ESP). Guarded against loops.
+    if (this.isReceiptAddress() && shouldAutoReply(email)) {
+      try {
+        await this.replyToEmail(email, {
+          fromName: "Mailslot",
+          body: receiptBody(this.address, { id, subject, snippet, receivedAt })
+        });
+      } catch (e) {
+        console.error("receipt reply failed:", e);
       }
     }
 
@@ -252,6 +261,46 @@ export class Inbox extends Agent<Env> {
   async retryWebhook(data: { payload: Record<string, unknown>; attempt: number }) {
     await this.deliverWebhook(data.payload, data.attempt);
   }
+}
+
+/**
+ * Loop prevention for auto-replies. Never answer bounces, auto-generated,
+ * or bulk/list mail — replying to a robot is how mail loops are born.
+ */
+function shouldAutoReply(email: AgentEmail): boolean {
+  const from = (email.from ?? "").toLowerCase();
+  if (!from || from.startsWith("mailer-daemon") || from.startsWith("postmaster")) return false;
+
+  const h = email.headers;
+  const autoSubmitted = h.get("auto-submitted");
+  if (autoSubmitted && autoSubmitted.toLowerCase() !== "no") return false;
+  if (h.get("x-auto-response-suppress")) return false;
+  if (h.get("list-id") || h.get("list-unsubscribe")) return false;
+  const precedence = (h.get("precedence") ?? "").toLowerCase();
+  if (precedence === "bulk" || precedence === "junk" || precedence === "list") return false;
+  return true;
+}
+
+function receiptBody(
+  address: string,
+  msg: { id: string; subject: string; snippet: string; receivedAt: number }
+): string {
+  return [
+    "Return receipt — your mail was handled by a Mailslot worker.",
+    "",
+    `  inbox:    ${address}`,
+    `  subject:  ${msg.subject || "(none)"}`,
+    `  parsed:   ${msg.snippet || "(empty body)"}`,
+    `  id:       ${msg.id}`,
+    `  received: ${new Date(msg.receivedAt).toISOString()}`,
+    "",
+    "This reply was sent by the same Cloudflare Worker that received,",
+    "parsed, and stored your message — self-hosted, no email provider",
+    "involved. An AI agent can now read it over MCP.",
+    "",
+    "Mailslot — your agent's email shouldn't come with a landlord.",
+    "https://mailslot.dev · https://github.com/mailslot/mailslot"
+  ].join("\n");
 }
 
 function toSummary(row: MessageRow): MessageSummary {
