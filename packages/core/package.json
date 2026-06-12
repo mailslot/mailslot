@@ -1,6 +1,6 @@
 {
   "name": "@mailslot/core",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Self-hosted email inbox for AI agents, on your own Cloudflare account",
   "license": "MIT",
   "type": "module",
