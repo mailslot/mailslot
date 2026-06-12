@@ -1,0 +1,59 @@
+# Publishes workspace packages to npm via OIDC Trusted Publishing — no token,
+# no secret, nothing to rotate. Each publish uses a per-run credential valid
+# for minutes, and npm attaches build provenance automatically.
+#
+# One-time setup per package, on npmjs.com (logged in as the org owner):
+#   package → Settings → Trusted Publisher → GitHub Actions
+#     organization: mailslot     repository: mailslot
+#     workflow:     publish.yml  environment: (leave blank)
+# Then (recommended) set "Publishing access" to require trusted publisher.
+#
+# Token fallback (only if trusted publishing can't be used): create a
+# granular access token (Read/Write, scoped to these packages; note npm caps
+# write tokens at 90 days now), store as repo secret NPM_TOKEN, and add to
+# the publish step:  env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }
+# plus `registry-url: https://registry.npmjs.org` on setup-node.
+
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # OIDC — required for npm trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Trusted publishing requires npm >= 11.5.1
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      - run: npm run typecheck --workspaces --if-present
+      - run: npm test --workspaces --if-present
+
+      - name: Publish packages whose version is not on the registry
+        run: |
+          set -euo pipefail
+          for dir in packages/core packages/create-mailslot; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "✓ $name@$version already published — skipping"
+            else
+              echo "→ publishing $name@$version"
+              npm publish --workspace "$name" --access public
+            fi
+          done
