@@ -1,8 +1,11 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
-/** Render the files of a scaffolded Mailslot project. */
-export function templates({ workerName, coreSpec = "^0.0.2" }) {
+/** Render the files of a scaffolded Mailslot project.
+ *  coreSpec (e.g. "^0.2.0") is required — run.js derives it from the wizard's
+ *  own version so the scaffold can't drift from the core it shipped with. */
+export function templates({ workerName, coreSpec }) {
+  if (!coreSpec) throw new Error("templates: coreSpec is required");
   const pkg = {
     name: workerName,
     private: true,

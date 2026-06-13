@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import * as p from "@clack/prompts";
@@ -6,6 +7,10 @@ import { sh, shInteractive, sleep } from "./sh.js";
 import { mxRecords, isCloudflareMx, isCloudflareNs, findZone, waitForCloudflareMx, zoneRoutingState } from "./dns.js";
 import { templates, writeScaffold } from "./scaffold.js";
 import { zoneId, routingStatus, enableRouting, setCatchAllToWorker } from "./cf-api.js";
+
+// Wizard and core ship in lockstep (same repo version), so the inbox we
+// scaffold should depend on the core that matches THIS wizard's version.
+const selfVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 export function parseArgs(argv) {
   const flags = {};
@@ -133,7 +138,7 @@ export async function run(argv) {
   const routingReady = isCloudflareMx(domainMx);
 
   // ---- scaffold ----
-  const coreSpec = flags["core-spec"] ?? "^0.0.2";
+  const coreSpec = flags["core-spec"] ?? `^${selfVersion}`;
   const files = templates({ workerName, coreSpec });
   await writeScaffold(dir, files);
   p.log.success(`Scaffolded ${dir}`);
