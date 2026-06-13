@@ -1,8 +1,10 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
-/** Render the files of a scaffolded Mailslot project. */
-export function templates({ workerName, coreSpec = "^0.0.2" }) {
+/** Render the files of a scaffolded Mailslot project.
+ *  coreSpec is normally supplied by run.js (derived from the wizard's own
+ *  version); the default here is only a fallback for direct calls/tests. */
+export function templates({ workerName, coreSpec = "^0.2.0" }) {
   const pkg = {
     name: workerName,
     private: true,

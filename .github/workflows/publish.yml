@@ -1,29 +1,48 @@
-# Publishes workspace packages to npm via OIDC Trusted Publishing — no token,
-# no secret, nothing to rotate. Each publish uses a per-run credential valid
-# for minutes, and npm attaches build provenance automatically.
+# Release pipeline: test → tag → GitHub release → npm publish, on every push
+# to main. The version in the two package.json files is the only knob. Both
+# packages move in lockstep (same repo version), so to cut a release:
 #
-# One-time setup per package, on npmjs.com (logged in as the org owner):
+#   npm version 0.3.0 --workspaces --no-git-tag-version   # bump both packages
+#   npm install --package-lock-only                       # sync the lockfile
+#   # commit, open PR, merge — this workflow does the rest:
+#   #   tags v0.3.0, cuts a release with generated notes, publishes to npm.
+#
+# Why test+tag+publish all live in ONE workflow run (instead of "create the
+# release here" + a separate workflow triggered by the release event): events
+# raised by the default GITHUB_TOKEN do NOT trigger other workflows, so a
+# bot-created release would never fire a release-triggered publish. One run
+# sidesteps that — no PAT, no token to rotate.
+#
+# Publishing uses npm OIDC Trusted Publishing — no secret, nothing to rotate;
+# npm attaches build provenance automatically. One-time setup per package, on
+# npmjs.com (as the org owner):
 #   package → Settings → Trusted Publisher → GitHub Actions
-#     organization: mailslot     repository: mailslot
-#     workflow:     publish.yml  environment: (leave blank)
+#     organization: mailslot   repository: mailslot
+#     workflow:     publish.yml   environment: (leave blank)
 # Then (recommended) set "Publishing access" to require trusted publisher.
+# This config keys on the workflow FILENAME — if you rename this file or move
+# publishing into another workflow, update it on both packages or npm 401s.
 #
-# Token fallback (only if trusted publishing can't be used): create a
-# granular access token (Read/Write, scoped to these packages; note npm caps
-# write tokens at 90 days now), store as repo secret NPM_TOKEN, and add to
-# the publish step:  env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }
+# Token fallback (only if trusted publishing can't be used): create a granular
+# access token (Read/Write, scoped to these packages; npm caps write tokens at
+# 90 days), store as repo secret NPM_TOKEN, and add to the publish step:
+#   env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }
 # plus `registry-url: https://registry.npmjs.org` on setup-node.
 
 name: Publish
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write # create tags + releases
   id-token: write # OIDC — required for npm trusted publishing
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -43,6 +62,26 @@ jobs:
 
       - run: npm run typecheck --workspaces --if-present
       - run: npm test --workspaces --if-present
+
+      - name: Tag + release when the repo version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          core=$(node -p "require('./packages/core/package.json').version")
+          wiz=$(node -p "require('./packages/create-mailslot/package.json').version")
+          if [ "$core" != "$wiz" ]; then
+            echo "::error::version mismatch — @mailslot/core=$core create-mailslot=$wiz."
+            echo "::error::Packages release in lockstep. Bump both: npm version <v> --workspaces"
+            exit 1
+          fi
+          tag="v$core"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "✓ release $tag already exists — nothing to release"
+          else
+            echo "→ creating release $tag"
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --generate-notes
+          fi
 
       - name: Publish packages whose version is not on the registry
         run: |
