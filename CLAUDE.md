@@ -1,8 +1,10 @@
 # Mailslot
 
 Self-hosted email inbox for AI agents on the user's own Cloudflare account.
-npm workspace monorepo: `packages/core` (the worker), `packages/create-mailslot`
-(deploy wizard — currently a placeholder bin).
+npm workspace monorepo: `packages/core` (the published library worker),
+`packages/create-mailslot` (deploy wizard — currently a placeholder bin),
+`packages/instance` (private, unpublished — this account's live mailslot.dev
+worker: `@mailslot/core` + a custom return-receipt auto-reply).
 
 ## Commands
 
@@ -10,7 +12,7 @@ npm workspace monorepo: `packages/core` (the worker), `packages/create-mailslot`
 npm install                 # workspace root
 npm run typecheck           # all packages
 npm run test                # vitest (pure-function tests in packages/core/test)
-npm run deploy              # wrangler deploy of @mailslot/core
+npm run deploy              # wrangler deploy of @mailslot/instance (the live worker)
 cd packages/core && npx wrangler dev --local   # local dev (needs .dev.vars)
 ```
 
@@ -21,14 +23,23 @@ cd packages/core && npx wrangler dev --local   # local dev (needs .dev.vars)
   routes to its own `Inbox` DO, instance name = lowercased full address)
 - `inbox.ts` — `Inbox extends Agent` (Cloudflare Agents SDK). One Durable
   Object per address: `onEmail` parses (postal-mime) → DO SQL + raw MIME to
-  R2 → optional forward → webhook. RPC methods: list/get/extractOtp (READ-
-  ONCE per message)/extractLinks/waitForMessage (long-poll)/info
+  R2 → optional forward → `onStored` hook → webhook. `onStored(email, msg)` is
+  a protected no-op extension point (runs while the email proxy is valid,
+  before webhook); core ships no outbound/business logic — subclasses override
+  it (see `packages/instance`). RPC methods: list/get/extractOtp (READ-ONCE
+  per message)/extractLinks/waitForMessage (long-poll)/info
 - `mcp.ts` — `MailslotMcp extends McpAgent`: six tools, thin wrappers over
   Inbox RPC
 - `api.ts` — HTTP mirror of the same tools; `auth.ts` — constant-time bearer
   check + address minting; `extract.ts` — pure OTP/link extraction (tested)
 - `shims/ai.ts` — stub for the agents SDK's optional dynamic `import("ai")`,
   aliased in wrangler.jsonc
+
+`packages/instance/src/index.ts` subclasses `Inbox`, overrides `onStored` to
+send a return receipt via Email Routing (`replyToEmail`, no ESP) for addresses
+in `RECEIPT_ADDRESSES`, guarded by a `shouldAutoReply` loop check. Its
+`wrangler.jsonc` mirrors the live worker's identity (name `mailslot`, same DO
+classes + migration tag `v1` + bucket) so deploys adopt the existing data.
 
 ## Conventions & constraints
 
