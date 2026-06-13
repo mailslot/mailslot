@@ -1,6 +1,6 @@
 # Mailslot
 
-**Self-hosted email inbox for AI agents — on your own Cloudflare account, on
+**Self-hosted email inbox for AI agents, on your own Cloudflare account, on
 your own domain.** The open-source alternative to hosted agent-email APIs.
 
 > Your agent's email shouldn't come with a landlord.
@@ -20,21 +20,24 @@ your own domain.** The open-source alternative to hosted agent-email APIs.
 
 ## Why
 
-Give an agent real work and it eventually needs to receive email. Sign up
-for a service — verification link. Log in — OTP. Register an account, reset
-a password, collect an invoice: the loop always closes through an inbox.
+Give an agent real work and it eventually needs to receive email.
+Sign up for a service, there's a verification link.
+Log in, there's an OTP. Register an account, reset a password, collect an invoice.
+The loop always closes through an inbox.
 
-Across the automation and agent systems I've worked on, the same wall comes
-up every time: the agent is fully capable of the task, then stalls at "check
-your email." And the existing options are both bad — hand the agent
-credentials to your personal Gmail, or rent an inbox from a hosted API that
-reads everything passing through it.
+Across the automation and agent systems I've worked on, the same wall comes up
+every time. The agent is fully capable of the task, and then it stalls at
+"check your email." The existing options are both bad in the same way. Either
+you hand the agent the keys to your personal Gmail, or you rent an inbox from a
+hosted API that reads everything passing through it.
 
-Mailslot is the third option: your agent's inbox, deployed to **your**
-Cloudflare account in about ten minutes. Inbound mail lands on your domain,
-is parsed and stored on your infrastructure, and is readable only by your
-agents. The privacy story isn't a policy. In fact, it's the architecture. We
-could not read your mail if we wanted to. There is no "we."
+So Mailslot is the third option. It's your agent's inbox, deployed to **your**
+Cloudflare account in about ten minutes. Mail lands on your domain, gets parsed
+and stored on your own infrastructure, and only your agents can read it.
+
+The privacy here isn't a policy you have to trust. It's the architecture. The
+mail never passes through anything of mine, because there is nothing of mine in
+the path. No "we," just your account.
 
 ## What your agent can do
 
@@ -42,16 +45,16 @@ could not read your mail if we wanted to. There is no "we."
 |---|---|
 | `list` / `search` | Browse and filter messages (sender, subject, time) |
 | `get` | Fetch a full message (text, HTML, headers) |
-| `extract_otp` | Pull the verification code out of a message — **read-once** |
+| `extract_otp` | Pull the verification code out of a message (**read-once**) |
 | `extract_links` | Pull magic links / verification URLs |
 | `wait_for_message` | Block until matching mail arrives (or timeout) |
-| `create_address` | Mint a fresh address on demand — one per task, never reused |
+| `create_address` | Mint a fresh address on demand, one per task, never reused |
 
 Exposed three ways, same engine:
 
-- **MCP server** — point Claude, OpenClaw, or any MCP client at it
-- **HTTP API** — token-auth REST for your own code
-- **Webhooks** — `message.received` pushed to n8n, Make, or anything with a URL
+- **MCP server**: point Claude, OpenClaw, or any MCP client at it
+- **HTTP API**: token-auth REST for your own code
+- **Webhooks**: `message.received` pushed to n8n, Make, or anything with a URL
 
 ## Quick start
 
@@ -59,20 +62,20 @@ Exposed three ways, same engine:
 npx create-mailslot
 ```
 
-Ten minutes, interactively: scaffolds a project **you own**, provisions
-storage and an API token, deploys the worker, walks Email Routing setup
-(Cloudflare API token or guided dashboard steps with live DNS verification),
-and finishes with a live round-trip — send an email from your phone, watch
-it arrive in your terminal. Flags for non-interactive use are in the
-[wizard's README](packages/create-mailslot/README.md).
+Ten minutes, interactively. It scaffolds a project **you own**, provisions
+storage and an API token, deploys the worker, walks you through Email Routing
+setup (a Cloudflare API token, or guided dashboard steps with live DNS
+verification), and finishes with a live round-trip. Send an email from your
+phone, watch it arrive in your terminal. Flags for non-interactive use are in
+the [wizard's README](packages/create-mailslot/README.md).
 
 Requirements: Node 18+, a Cloudflare account (free tier works), and a domain
 on Cloudflare.
 
 > ⚠️ **Domain reality check (the wizard enforces this):** Email Routing is
 > zone-level. If a domain's apex already receives mail elsewhere (Google
-> Workspace, Lark, O365…), that domain can't host Mailslot at all — not
-> even on a subdomain — without breaking its existing mail. Use a separate
+> Workspace, Lark, O365, and so on), that domain cannot host Mailslot at all,
+> not even on a subdomain, without breaking its existing mail. Use a separate
 > domain. (Subdomains work fine on zones where Email Routing is already
 > enabled.)
 
@@ -111,10 +114,11 @@ curl -s "$WORKER/v1/inboxes/<address>/wait?timeout_s=90" \
 </details>
 
 Config lives in two instance-specific values that survive every deploy
-(`keep_vars`): `EMAIL_DOMAIN` (var — dashboard-editable) and `MAILSLOT_TOKEN`
-(secret). The repo's `wrangler.jsonc` stays generic. Optional: `FORWARD_TO` +
-`FORWARD_MODE=all` (copy mail to a verified address), `WEBHOOK_URL` /
-`WEBHOOK_SECRET` (signed `message.received` events).
+(`keep_vars`): `EMAIL_DOMAIN` (a var, editable in the dashboard) and
+`MAILSLOT_TOKEN` (a secret). The repo's `wrangler.jsonc` stays generic.
+Optional: `FORWARD_TO` plus `FORWARD_MODE=all` (copy mail to a verified
+address), and `WEBHOOK_URL` / `WEBHOOK_SECRET` (signed `message.received`
+events).
 
 ### Connect an agent (MCP)
 
@@ -132,11 +136,11 @@ agent: create_address()            → otp-x7f2@agents.example.com
 agent: (signs up at the service using that address)
 agent: wait_for_message(timeout=120)
 agent: extract_otp()               → "482913"   [marked read-once]
-agent: (submits the code — done)
+agent: (submits the code, done)
 ```
 
-No human inbox touched. No credentials shared. The address is disposable;
-mint a new one per task.
+No human inbox touched. No credentials shared. The address is disposable. Mint
+a new one per task.
 
 ## Why self-hosted
 
@@ -156,39 +160,38 @@ asks where the data lives.
 
 ## Built on
 
-- [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/) — the SMTP edge; no port 25, no mail server to run
-- [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) — one Durable Object per inbox (`routeAgentEmail`, `onEmail`), `McpAgent` for the MCP surface
-- [postal-mime](https://github.com/postalio/postal-mime) — MIME parsing built for Workers
+- [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/): the SMTP edge, no port 25 and no mail server to run
+- [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/): one Durable Object per inbox (`routeAgentEmail`, `onEmail`), `McpAgent` for the MCP surface
+- [postal-mime](https://github.com/postalsys/postal-mime): MIME parsing built for Workers
 
 Standard Cloudflare stack, thin on top. If you can maintain a Worker, you can
 maintain this.
 
 ## Integrations
 
-- **MCP** — works with any MCP client today (Claude Code, Claude Desktop, OpenClaw, custom agents)
-- **n8n** — community node (trigger + actions) — *in progress*
-- **OpenClaw skill** — points at *your* instance, not a hosted cloud — *in progress*
+- **MCP**: works with any MCP client today (Claude Code, Claude Desktop, OpenClaw, custom agents)
+- **n8n**: community node (trigger + actions), *in progress*
+- **OpenClaw skill**: points at *your* instance, not a hosted cloud, *in progress*
 
 Adapters are thin wrappers over one versioned event schema and one tool API.
-Want an adapter we don't have? The contract is small — PRs welcome.
+Want an adapter that isn't here yet? The contract is small, so PRs are welcome.
 
 ## Roadmap
 
 - [x] v1: receive → parse → store → MCP/HTTP tools → webhooks → forward
 - [x] `create-mailslot` deploy wizard
-- [x] Return-receipt auto-reply (`replyToEmail` — no ESP needed; set
-      `RECEIPT_ADDRESSES` to enable per address, auto-mail loop guards built in)
+- [x] Return-receipt auto-reply (`replyToEmail`, no ESP needed; set
+      `RECEIPT_ADDRESSES` to enable per address, with auto-mail loop guards built in)
 - [ ] n8n community node, OpenClaw skill
 - [ ] Outbound via your own Resend/Postmark/SES keys (BYO, your deliverability)
 
 Deliberately **not** planned: hosted multi-tenant service, AI triage of your
-personal mail, reading anything we don't have to. Boring, auditable plumbing.
+personal mail, reading anything it doesn't have to. Boring, auditable plumbing.
 
 ## Need it deployed for you?
 
-I do fixed-price integrations — your domain, your Cloudflare account, wired
-into your n8n/agent stack, with a handover doc. *(Contact link coming with
-the first release.)*
+I do fixed-price integrations. Your domain, your Cloudflare account, wired into your n8n or agent stack, with a handover doc.
+Email [inquiry@mailslot.dev](mailto:inquiry@mailslot.dev) and tell me what you're building.
 
 ## License
 
