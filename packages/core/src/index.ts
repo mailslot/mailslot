@@ -6,6 +6,8 @@ import { handleApi } from "./api";
 import { checkBearerToken } from "./auth";
 
 export { Inbox, MailslotMcp };
+export type { MessageSummary, MessageDetail } from "./inbox";
+export type { AgentEmail } from "agents";
 
 const mcpHandler = MailslotMcp.serve("/mcp", { binding: "MailslotMcp" });
 

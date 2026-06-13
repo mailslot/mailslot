@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Same identity as the original packages/core deploy: same worker name, DO
+  // class names, migration tag, and bucket. Deploying this UPDATES the existing
+  // live worker and adopts its Durable Objects + stored mail — no data loss.
+  "name": "mailslot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "Inbox", "class_name": "Inbox" },
+      { "name": "MailslotMcp", "class_name": "MailslotMcp" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Inbox", "MailslotMcp"] }
+  ],
+  "r2_buckets": [
+    { "binding": "RAW", "bucket_name": "mailslot-raw" }
+  ],
+  "vars": {
+    "FORWARD_MODE": "none"
+  },
+  // Instance values are NOT in this file (kept generic, no secrets). Set once,
+  // survive deploys via keep_vars:
+  //   EMAIL_DOMAIN      — var (dashboard)
+  //   MAILSLOT_TOKEN    — secret (wrangler secret put)
+  //   RECEIPT_ADDRESSES — var (dashboard): addresses that send a return receipt
+  // Optional: FORWARD_TO, WEBHOOK_URL (vars); WEBHOOK_SECRET (secret)
+  "keep_vars": true,
+  "alias": {
+    // Optional dep of the agents SDK, dynamically imported in paths we don't use
+    "ai": "./src/shims/ai.ts"
+  },
+  "observability": { "enabled": true }
+}

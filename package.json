@@ -5,8 +5,8 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces",
-    "deploy": "npm run deploy --workspace @mailslot/core"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "deploy": "npm run deploy --workspace @mailslot/instance"
   }
 }

@@ -1,0 +1,23 @@
+{
+  "name": "@mailslot/instance",
+  "version": "0.2.0",
+  "private": true,
+  "description": "The live mailslot.dev worker: @mailslot/core plus a return-receipt auto-reply. Never published.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@mailslot/core": "*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
