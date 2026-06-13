@@ -1,9 +1,9 @@
 # Mailslot
 
-**Self-hosted email inbox for AI agents, on your own Cloudflare account, on
-your own domain.** The open-source alternative to hosted agent-email APIs.
+> A real inbox for AI agents. Self-hosted.
 
-> Your agent's email shouldn't come with a landlord.
+**On your own Cloudflare account, on your own domain.** The open-source
+alternative to hosted agent-email APIs.
 
 ```
 ┌─────────────────────────── your Cloudflare account ───────────────────────────┐
@@ -43,8 +43,8 @@ the path. No "we," just your account.
 
 | Tool | What it does |
 |---|---|
-| `list` / `search` | Browse and filter messages (sender, subject, time) |
-| `get` | Fetch a full message (text, HTML, headers) |
+| `list_messages` | Browse and filter messages (sender, subject, body) |
+| `get_message` | Fetch a full message (text, HTML) |
 | `extract_otp` | Pull the verification code out of a message (**read-once**) |
 | `extract_links` | Pull magic links / verification URLs |
 | `wait_for_message` | Block until matching mail arrives (or timeout) |
@@ -180,8 +180,10 @@ Want an adapter that isn't here yet? The contract is small, so PRs are welcome.
 
 - [x] v1: receive → parse → store → MCP/HTTP tools → webhooks → forward
 - [x] `create-mailslot` deploy wizard
-- [x] Return-receipt auto-reply (`replyToEmail`, no ESP needed; set
-      `RECEIPT_ADDRESSES` to enable per address, with auto-mail loop guards built in)
+- [x] `onStored(email, message)` extension hook: subclass `Inbox` for custom
+      per-deployment logic. Core stays a clean library with no business logic;
+      the live instance (`@mailslot/instance`) uses the hook for return-receipt
+      auto-replies (`replyToEmail`, no ESP).
 - [ ] n8n community node, OpenClaw skill
 - [ ] Outbound via your own Resend/Postmark/SES keys (BYO, your deliverability)
 
