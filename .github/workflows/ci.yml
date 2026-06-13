@@ -1,8 +1,8 @@
 name: CI
 
+# Tests run on PRs only — main is covered by publish.yml's own test gate
+# before it tags/publishes, so a second run here would be redundant.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
