@@ -1,6 +1,6 @@
 {
   "name": "@mailslot/instance",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "The live mailslot.dev worker: @mailslot/core plus a return-receipt auto-reply. Never published.",
   "type": "module",
