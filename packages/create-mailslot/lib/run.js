@@ -154,6 +154,24 @@ export async function run(argv) {
     if (code !== 0) throw new Error("wrangler login failed");
   }
 
+  // ---- existing-instance guard ----
+  // Re-running against a live worker rotates MAILSLOT_TOKEN (existing
+  // API/MCP clients break until updated) and replaces the deployed code.
+  // Inbox data survives: same worker name + DO classes + R2 bucket.
+  const existing = await wrangler(["deployments", "list"]);
+  if (existing.code === 0) {
+    p.log.warn(
+      `A worker named "${workerName}" is already deployed on this account.\n` +
+        `Continuing will:\n` +
+        `  • rotate MAILSLOT_TOKEN — existing API/MCP clients stop working\n` +
+        `    until you give them the new token\n` +
+        `  • replace the deployed code with @mailslot/core ${coreSpec}\n` +
+        `Inbox data (messages, raw mail) is preserved.`
+    );
+    const overwrite = bail(await p.confirm({ message: "Continue and overwrite?", initialValue: false }));
+    if (!overwrite) return p.outro("No changes deployed — your existing instance is untouched.");
+  }
+
   // ---- provision: bucket, token, deploy ----
   s.start("Creating R2 bucket");
   const bucket = await wrangler(["r2", "bucket", "create", `${workerName}-raw`]);
