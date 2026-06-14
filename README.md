@@ -6,7 +6,7 @@
 alternative to hosted agent-email APIs.
 
 ```
-┌─────────────────────────── your Cloudflare account ───────────────────────────┐
+┌─────────────────────────── your Cloudflare account  ───────────────────────────┐
 │                                                                                │
 │  any sender ──▶ Email Routing ──▶ one Durable Object per address               │
 │                                      │  parse · store · read-once state        │
@@ -183,9 +183,8 @@ Want an adapter that isn't here yet? The contract is small, so PRs are welcome.
 - [x] `onStored(email, message)` extension hook: subclass `Inbox` for custom
       per-deployment logic. Core stays a clean library with no business logic;
       the live instance (`@mailslot/instance`) uses the hook for return-receipt
-      auto-replies (`replyToEmail`, no ESP).
+      auto-replies (`replyToEmail`, no ESP). See [instance/README](packages/instance/README.md).
 - [ ] n8n community node, OpenClaw skill
-- [ ] Outbound via your own Resend/Postmark/SES keys (BYO, your deliverability)
 
 Deliberately **not** planned: hosted multi-tenant service, AI triage of your
 personal mail, reading anything it doesn't have to. Boring, auditable plumbing.
