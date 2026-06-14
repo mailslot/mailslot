@@ -13,6 +13,34 @@ branding live here and never reach the published library.
 If you're looking for the canonical example of **how to customize a Mailslot
 deployment**, `src/index.ts` is it.
 
+## Outbound: replying via the Agents SDK (no ESP)
+
+Mailslot's core ships no outbound logic, but you don't need a Resend/Postmark/SES
+key to send a reply. The Cloudflare Agents SDK gives every `Inbox` a
+`replyToEmail(email, options)` method that answers the sender back over Email
+Routing — it builds a MIME message (correct `In-Reply-To`/`Message-ID` threading
+headers) and calls `email.reply()` on the inbound message.
+
+The catch: `email.reply()` is only valid while the inbound email proxy is live,
+i.e. inside the `onStored(email, message)` hook, before the webhook fires. So the
+pattern is "reply during processing," not "send arbitrary mail later."
+
+```ts
+export class Inbox extends CoreInbox {
+  protected async onStored(email: AgentEmail, msg: MessageSummary): Promise<void> {
+    if (!this.isReceiptAddress() || !shouldAutoReply(email)) return;
+    await this.replyToEmail(email, {
+      fromName: "Mailslot",
+      body: receiptBody(this.address, msg)
+      // subject defaults to `Re: <original>`; pass `subject`/`contentType`/`headers` to override
+    });
+  }
+}
+```
+
+See `src/index.ts` for the full version, including the `shouldAutoReply` loop
+guard that suppresses replies to auto-generated, bulk, and bounce mail.
+
 ## Layout
 
 - `src/index.ts` — the `Inbox` subclass + worker entry (re-exports core's
